@@ -5,6 +5,8 @@ import org.andengine.engine.camera.hud.HUD;
 import org.andengine.engine.camera.hud.controls.AnalogOnScreenControl;
 import org.andengine.engine.camera.hud.controls.AnalogOnScreenControl.IAnalogOnScreenControlListener;
 import org.andengine.engine.camera.hud.controls.BaseOnScreenControl;
+import org.andengine.engine.camera.hud.controls.BaseOnScreenControl.IOnScreenControlListener;
+import org.andengine.engine.camera.hud.controls.DigitalOnScreenControl;
 import org.andengine.engine.handler.IUpdateHandler;
 import org.andengine.engine.handler.physics.PhysicsHandler;
 import org.andengine.engine.options.EngineOptions;
@@ -51,7 +53,6 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 	private static final float CAMERA_WIDTH = 480;
 	private static final float CAMERA_HEIGHT = 320;
 	private BoundCamera mBoundChaseCamera;
-	private boolean mPlaceOnScreenControlsAtDifferentVerticalLocations;
 	private BuildableBitmapTextureAtlas mBuildableBitmapTextureAtlas;
 	private BitmapTextureAtlas mBitmapTextureAtlas;
 	private ITiledTextureRegion mPlayerTextureRegion;
@@ -73,7 +74,6 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 			if(MultiTouch.isSupportedDistinct(this)) {
 				Toast.makeText(this, "MultiTouch detected --> Both controls will work properly!", Toast.LENGTH_SHORT).show();
 			} else {
-				this.mPlaceOnScreenControlsAtDifferentVerticalLocations = true;
 				Toast.makeText(this, "MultiTouch detected, but your device has problems distinguishing between fingers.\n\nControls are placed at different vertical locations.", Toast.LENGTH_LONG).show();
 			}
 		} else {
@@ -170,17 +170,19 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 		scene.attachChild(player);
 		
 		//Putting the player on the TMX map and adding controls to the player.
-		final AnalogOnScreenControl analogOnScreenControl = new AnalogOnScreenControl(0, CAMERA_HEIGHT-this.mOnScreenControlBaseTextureRegion.getHeight(), this.mBoundChaseCamera, 
-				this.mOnScreenControlBaseTextureRegion, this.mOnScreenControlKnobTextureRegion, 0.1f, 200, this.getVertexBufferObjectManager(), new IAnalogOnScreenControlListener(){
+		final DigitalOnScreenControl digitalOnScreenControl = new DigitalOnScreenControl(0, CAMERA_HEIGHT-this.mOnScreenControlBaseTextureRegion.getHeight(), this.mBoundChaseCamera, 
+				this.mOnScreenControlBaseTextureRegion, this.mOnScreenControlKnobTextureRegion, 0.1f, this.getVertexBufferObjectManager(), new IOnScreenControlListener(){
 			@Override
 			public void onControlChange(final BaseOnScreenControl pBaseOnScreenControl, final float pValueX, final float pValueY){
 				physicsHandler.setVelocity(pValueX * 100, pValueY * 100);
 				player.animate(new long[]{200,200,200},6,8,true);
 			}
+			/* part of the analog impl.
 			@Override
 			public void onControlClick(final AnalogOnScreenControl pAnalogOnScreenControl){
 				player.registerEntityModifier(new SequenceEntityModifier(new ScaleModifier(0.25f, 1, 1.5f), new ScaleModifier(0.25f, 1.5f, 1)));
 			}
+			*/
 		});
 		
 		//TODO: Remove the current tile highlighter for final product.
@@ -205,13 +207,13 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 			}
 		});
 		
-		analogOnScreenControl.getControlBase().setBlendFunction(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
-		analogOnScreenControl.getControlBase().setAlpha(0.5f);
-		analogOnScreenControl.getControlBase().setScaleCenter(0, 128);
-		analogOnScreenControl.getControlBase().setScale(1.25f);
-		analogOnScreenControl.getControlKnob().setScale(1.25f);
-		analogOnScreenControl.refreshControlKnobPosition();
-		scene.setChildScene(analogOnScreenControl);
+		digitalOnScreenControl.getControlBase().setBlendFunction(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+		digitalOnScreenControl.getControlBase().setAlpha(0.5f);
+		digitalOnScreenControl.getControlBase().setScaleCenter(0, 128);
+		digitalOnScreenControl.getControlBase().setScale(1.25f);
+		digitalOnScreenControl.getControlKnob().setScale(1.25f);
+		digitalOnScreenControl.refreshControlKnobPosition();
+		//scene.setChildScene(digitalOnScreenControl);
 		
 		//TODO modify action button location to not use a hard value position.
 		final ButtonSprite actionButton = new ButtonSprite(centerX+200, centerY+110, this.actionButtonTextureRegion, this.getVertexBufferObjectManager(), this);
@@ -222,10 +224,11 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 		HUD gameHud = new HUD();
 		gameHud.registerTouchArea(actionButton);
 		gameHud.attachChild(actionButton);
+		gameHud.setChildScene(digitalOnScreenControl);
 		mBoundChaseCamera.setHUD(gameHud);
 		
 		//TODO: add an enemy or some sort of objective.
-		final Sprite enemySprite = new Sprite(23, 24, this.mEnemyTextureRegion, this.getVertexBufferObjectManager());
+		final AnimatedSprite enemySprite = new AnimatedSprite(23, 24, this.mEnemyTextureRegion, this.getVertexBufferObjectManager());
 		scene.attachChild(enemySprite);
 		
 		//adding collision detection to the player and enemy. Now need to clear that collision data
@@ -237,11 +240,14 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 			public void onUpdate(final float pSecondsElapsed){
 				Color color = player.getColor();
 				if (enemySprite.collidesWith(player)){
-					player.setColor(1,0,0);
+					//TODO: add functionality for losing health.
 				}
 				//add the case where the player is pressing the button and it collides with the enemy.
 				if (enemySprite.collidesWith(currentTileRectangle)&& actionButton.isPressed()){
-					enemySprite.setColor(1,0,0);
+					enemySprite.animate(200,3);
+				}
+				else if (enemySprite.collidesWith(player) && enemySprite.isAnimationRunning() && actionButton.isPressed()){
+					enemySprite.stopAnimation();
 				}
 				if (!enemySprite.collidesWith(player)){
 					player.setColor(color);
