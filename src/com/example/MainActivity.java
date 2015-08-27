@@ -2,8 +2,6 @@ package com.example;
 
 import org.andengine.engine.camera.BoundCamera;
 import org.andengine.engine.camera.hud.HUD;
-import org.andengine.engine.camera.hud.controls.AnalogOnScreenControl;
-import org.andengine.engine.camera.hud.controls.AnalogOnScreenControl.IAnalogOnScreenControlListener;
 import org.andengine.engine.camera.hud.controls.BaseOnScreenControl;
 import org.andengine.engine.camera.hud.controls.BaseOnScreenControl.IOnScreenControlListener;
 import org.andengine.engine.camera.hud.controls.DigitalOnScreenControl;
@@ -12,14 +10,11 @@ import org.andengine.engine.handler.physics.PhysicsHandler;
 import org.andengine.engine.options.EngineOptions;
 import org.andengine.engine.options.ScreenOrientation;
 import org.andengine.engine.options.resolutionpolicy.RatioResolutionPolicy;
-import org.andengine.entity.modifier.ScaleModifier;
-import org.andengine.entity.modifier.SequenceEntityModifier;
 import org.andengine.entity.primitive.Rectangle;
 import org.andengine.entity.scene.Scene;
 import org.andengine.entity.sprite.AnimatedSprite;
 import org.andengine.entity.sprite.ButtonSprite;
 import org.andengine.entity.sprite.ButtonSprite.OnClickListener;
-import org.andengine.entity.sprite.Sprite;
 import org.andengine.entity.util.FPSLogger;
 import org.andengine.extension.tmx.TMXLayer;
 import org.andengine.extension.tmx.TMXLoader;
@@ -46,12 +41,13 @@ import org.andengine.util.color.Color;
 import org.andengine.util.debug.Debug;
 
 import android.opengl.GLES20;
+import android.util.DisplayMetrics;
 import android.widget.Toast;
 
 public class MainActivity extends SimpleBaseGameActivity implements OnClickListener {
 
-	private static final float CAMERA_WIDTH = 480;
-	private static final float CAMERA_HEIGHT = 320;
+	private static float CAMERA_WIDTH = 480;
+	private static float CAMERA_HEIGHT = 320;
 	private BoundCamera mBoundChaseCamera;
 	private BuildableBitmapTextureAtlas mBuildableBitmapTextureAtlas;
 	private BitmapTextureAtlas mBitmapTextureAtlas;
@@ -62,9 +58,17 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 	private TextureRegion mOnScreenControlBaseTextureRegion;
 	private TextureRegion mOnScreenControlKnobTextureRegion;
 	private TMXTiledMap mTMXTiledMap;
-
+	
+	
 	@Override
 	public EngineOptions onCreateEngineOptions() {
+		/*
+		//Makes the scene fit the users screen (a bit too far zoomed out though).
+		DisplayMetrics displayMetrics = new DisplayMetrics();
+		this.getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+		CAMERA_WIDTH = (float)displayMetrics.widthPixels;
+		CAMERA_HEIGHT = (float)displayMetrics.heightPixels;
+		*/
 		this.mBoundChaseCamera = new BoundCamera(0, 0, CAMERA_WIDTH, CAMERA_HEIGHT);
 
 		final EngineOptions engineOptions = new EngineOptions(true, ScreenOrientation.LANDSCAPE_FIXED, new RatioResolutionPolicy(CAMERA_WIDTH, CAMERA_HEIGHT), this.mBoundChaseCamera);
@@ -175,7 +179,15 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 			@Override
 			public void onControlChange(final BaseOnScreenControl pBaseOnScreenControl, final float pValueX, final float pValueY){
 				physicsHandler.setVelocity(pValueX * 100, pValueY * 100);
-				player.animate(new long[]{200,200,200},6,8,true);
+				if (pValueX == 1){ //Going RIGHT
+					player.animate(new long[]{100,100,100},3,5,false);
+				} else if (pValueX == -1){//Going LEFT
+					player.animate(new long[]{100,100,100},9,11,false);
+				} else if (pValueY == 1){//Going DOWN
+					player.animate(new long[]{100,100,100},6,8,false);
+				} else if (pValueY == -1){//Going UP
+					player.animate(new long[]{100,100,100},0,2,false);
+				}
 			}
 			/* part of the analog impl.
 			@Override
@@ -227,7 +239,7 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 		gameHud.setChildScene(digitalOnScreenControl);
 		mBoundChaseCamera.setHUD(gameHud);
 		
-		//TODO: add an enemy or some sort of objective.
+		//add an enemy.
 		final AnimatedSprite enemySprite = new AnimatedSprite(23, 24, this.mEnemyTextureRegion, this.getVertexBufferObjectManager());
 		scene.attachChild(enemySprite);
 		
@@ -254,7 +266,7 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 				}
 			}
 		});
-		
+		//TODO: make the enemy chase the player.
 		
 		return scene;
 	}
