@@ -10,11 +10,13 @@ import org.andengine.engine.handler.physics.PhysicsHandler;
 import org.andengine.engine.options.EngineOptions;
 import org.andengine.engine.options.ScreenOrientation;
 import org.andengine.engine.options.resolutionpolicy.RatioResolutionPolicy;
+import org.andengine.entity.modifier.MoveByModifier;
 import org.andengine.entity.primitive.Rectangle;
 import org.andengine.entity.scene.Scene;
 import org.andengine.entity.sprite.AnimatedSprite;
 import org.andengine.entity.sprite.ButtonSprite;
 import org.andengine.entity.sprite.ButtonSprite.OnClickListener;
+import org.andengine.entity.sprite.TiledSprite;
 import org.andengine.entity.util.FPSLogger;
 import org.andengine.extension.tmx.TMXLayer;
 import org.andengine.extension.tmx.TMXLoader;
@@ -48,6 +50,7 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 
 	private static float CAMERA_WIDTH = 480;
 	private static float CAMERA_HEIGHT = 320;
+	private static float enemySpeed = 1.0f;
 	private BoundCamera mBoundChaseCamera;
 	private BuildableBitmapTextureAtlas mBuildableBitmapTextureAtlas;
 	private BitmapTextureAtlas mBitmapTextureAtlas;
@@ -173,6 +176,10 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 		
 		scene.attachChild(player);
 		
+		//add an enemy.
+		final AnimatedSprite enemySprite = new AnimatedSprite(23, 24, this.mEnemyTextureRegion, this.getVertexBufferObjectManager());
+		scene.attachChild(enemySprite);
+		
 		//Putting the player on the TMX map and adding controls to the player.
 		final DigitalOnScreenControl digitalOnScreenControl = new DigitalOnScreenControl(0, CAMERA_HEIGHT-this.mOnScreenControlBaseTextureRegion.getHeight(), this.mBoundChaseCamera, 
 				this.mOnScreenControlBaseTextureRegion, this.mOnScreenControlKnobTextureRegion, 0.1f, this.getVertexBufferObjectManager(), new IOnScreenControlListener(){
@@ -180,15 +187,16 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 			public void onControlChange(final BaseOnScreenControl pBaseOnScreenControl, final float pValueX, final float pValueY){
 				physicsHandler.setVelocity(pValueX * 100, pValueY * 100);
 				if (pValueX == 1){ //Going RIGHT
-					player.animate(new long[]{100,100,100},3,5,false);
+					player.animate(new long[]{150,150,150},3,5,false);
 				} else if (pValueX == -1){//Going LEFT
-					player.animate(new long[]{100,100,100},9,11,false);
+					player.animate(new long[]{150,150,150},9,11,false);
 				} else if (pValueY == 1){//Going DOWN
-					player.animate(new long[]{100,100,100},6,8,false);
+					player.animate(new long[]{150,150,150},6,8,false);
 				} else if (pValueY == -1){//Going UP
-					player.animate(new long[]{100,100,100},0,2,false);
+					player.animate(new long[]{150,150,150},0,2,false);
 				}
 			}
+			
 			/* part of the analog impl.
 			@Override
 			public void onControlClick(final AnalogOnScreenControl pAnalogOnScreenControl){
@@ -216,6 +224,44 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 					// tmxTile.setTextureRegion(null); <-- Rubber-style removing of tiles =D
 					currentTileRectangle.setPosition(tmxTile.getTileX(), tmxTile.getTileY());
 				}
+				//Completed, but could use some improvements: make the enemy chase the player.
+				//Maybe instead of the Pythagorean theorem use a Manhattan path finding heuristic. 
+				//Use the Pythagorean theorem a^2 + b^2 = c^2 to get the distance between the two entities.
+
+				double dx = Math.abs(player.getX() - enemySprite.getX());
+				double dy = Math.abs(player.getY() - enemySprite.getY());
+				double length = Math.sqrt(dx*dx + dy*dy);
+				double accelerationX = Math.abs(dx/length);
+				double accelerationY = Math.abs(dy/length);
+				float enemyPositionX = enemySprite.getX();
+				float enemyPositionY = enemySprite.getY();
+				float enemyPositionX2 = enemySprite.getX();
+				float enemyPositionY2 = enemySprite.getY();
+				enemyPositionX += (accelerationX * enemySpeed);
+				enemyPositionY += (accelerationY * enemySpeed * 1.5);
+				enemyPositionY2 -= (accelerationY * enemySpeed * 1.5);
+				enemyPositionX2 -= (accelerationX * enemySpeed);
+				//move the enemy to the right on the scene.
+				if (player.getX() >enemySprite.getX()){
+					enemySprite.setX(enemyPositionX);
+					enemySprite.animate(new long[]{150,150,150},3,5,false);
+				}
+				//move the enemy left on the scene.
+				if(player.getX() < enemySprite.getX()){
+					enemySprite.setX(enemyPositionX2);
+					enemySprite.animate(new long[]{150,150,150},9,11,false);
+				}
+				//move the enemy down on the scene.
+				if (player.getY() > enemySprite.getY()){
+					enemySprite.setY(enemyPositionY);
+					enemySprite.animate(new long[]{150,150,150},6,8,false);
+				}
+				//move the enemy up on the scene.
+				if(player.getY() < enemySprite.getY()){
+					enemySprite.setY(enemyPositionY2);
+					enemySprite.animate(new long[]{150,150,150},0,2,false);
+				}
+				//enemySprite.setPosition(enemyPositionX, enemyPositionY);
 			}
 		});
 		
@@ -239,9 +285,7 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 		gameHud.setChildScene(digitalOnScreenControl);
 		mBoundChaseCamera.setHUD(gameHud);
 		
-		//add an enemy.
-		final AnimatedSprite enemySprite = new AnimatedSprite(23, 24, this.mEnemyTextureRegion, this.getVertexBufferObjectManager());
-		scene.attachChild(enemySprite);
+		
 		
 		//adding collision detection to the player and enemy. Now need to clear that collision data
 		scene.registerUpdateHandler(new IUpdateHandler(){
@@ -264,9 +308,10 @@ public class MainActivity extends SimpleBaseGameActivity implements OnClickListe
 				if (!enemySprite.collidesWith(player)){
 					player.setColor(color);
 				}
+
+				
 			}
 		});
-		//TODO: make the enemy chase the player.
 		
 		return scene;
 	}
